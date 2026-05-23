@@ -4,6 +4,19 @@
 
 It can hide a message in visible text, optionally protect that hidden message with a password, and extract the hidden message again later. Without a password, the message is hidden but not password-protected.
 
+## Use Cases
+
+`raphecrypt` is useful when you want text to carry a second layer of information while still looking like ordinary text.
+
+- Add private notes to visible messages, documents, or snippets without changing what readers see.
+- Send a password-protected note through a plain-text channel while keeping the visible text harmless and readable.
+- Attach metadata, tracking IDs, or workflow hints to text that still needs to look clean in editors, terminals, or logs.
+- Create puzzle, game, or ARG-style messages where hidden text can be discovered later.
+- Mark generated text or drafts with invisible context so you can identify, extract, or verify it later.
+- Store a short recovery hint or operator note inside a copied text block without needing a separate sidecar file.
+
+This is not a replacement for secure messaging. Some apps and websites may remove invisible Unicode characters, so test the full copy/paste or delivery path before relying on it.
+
 ## Quick Start
 
 Hide a message:
@@ -139,6 +152,93 @@ When `--hide` is provided, the program inserts an invisible Unicode payload into
 The hidden payload uses Unicode format characters from the `\p{Cf}` category. This hides the text in the output stream, but hiding without a password is steganographic hiding, not cryptographic encryption.
 
 When `--password`, `--password-file`, or `--password-stdin` is provided, the hidden text is encrypted before it is embedded. When `--extract` is used without a password, the program extracts a plaintext hidden payload. When a password is provided during extraction, the password is used to decrypt an encrypted hidden payload and the recovered hidden text is written as the output.
+
+## HEX View Examples
+
+The visible input bytes stay readable in the output. The hidden payload is added as extra invisible Unicode bytes before the final newline.
+
+Create a small input file:
+
+```sh
+printf 'Visible text\n' > input.txt
+xxd -g 1 -c 16 input.txt
+```
+
+HEX output:
+
+```text
+00000000: 56 69 73 69 62 6c 65 20 74 65 78 74 0a     Visible text.
+```
+
+Interpretation:
+
+```text
+56 69 73 69 62 6c 65 20 74 65 78 74  = "Visible text"
+0a                                      = newline
+```
+
+Hide `hi` without a password:
+
+```sh
+raphecrypt --input input.txt --hide 'hi' --output output.txt
+xxd -g 1 -c 16 output.txt
+```
+
+Abbreviated HEX output:
+
+```text
+00000000: 56 69 73 69 62 6c 65 20 74 65 78 74 f3 a0 80 81  Visible text....
+00000010: f3 a0 80 b0 f3 a0 80 b1 f3 a0 80 b0 f3 a0 80 b1  ................
+...
+000000d0: f3 a0 81 bf 0a                                      .....
+```
+
+Interpretation:
+
+```text
+56 69 73 69 62 6c 65 20 74 65 78 74  = unchanged visible text
+f3 a0 80 81                            = hidden payload start marker
+f3 a0 80 b0 / f3 a0 80 b1              = hidden payload bit characters
+f3 a0 81 bf                            = hidden payload end marker
+0a                                      = final newline
+```
+
+Extracting this file returns the hidden text:
+
+```sh
+raphecrypt --input output.txt --extract
+```
+
+```text
+hi
+```
+
+Hide `hi` with password protection:
+
+```sh
+raphecrypt --input input.txt --hide 'hi' --password 'mysecret' --output output.txt
+xxd -g 1 -c 16 output.txt
+```
+
+Abbreviated HEX output:
+
+```text
+00000000: 56 69 73 69 62 6c 65 20 74 65 78 74 f3 a0 80 81  Visible text....
+00000010: f3 a0 80 b1 f3 a0 80 b0 f3 a0 80 b1 f3 a0 80 b0  ................
+...
+```
+
+The visible prefix is still `Visible text`, but the hidden section is different from the no-password example. It is also different on each run because password-protected output uses fresh random values for encryption.
+
+Decrypting this file with the same password returns the hidden text:
+
+```sh
+raphecrypt --input output.txt --extract 'mysecret'
+```
+
+```text
+hi
+```
 
 ## Build
 
