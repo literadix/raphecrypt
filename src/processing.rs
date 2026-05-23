@@ -307,8 +307,34 @@ mod tests {
     use super::{
         BIT_ONE, BIT_ZERO, ENCRYPTED_PAYLOAD_VERSION, PAYLOAD_END, PAYLOAD_START,
         PLAINTEXT_PAYLOAD_VERSION, ProcessingError, create_hidden_payload, extract_hidden_text,
-        process_text,
+        extract_payload, hide_payload, process_text,
     };
+
+    fn visible_text(input: &str) -> String {
+        input
+            .chars()
+            .filter(|character| {
+                !matches!(*character, PAYLOAD_START | PAYLOAD_END | BIT_ZERO | BIT_ONE)
+            })
+            .collect()
+    }
+
+    fn plaintext_payload_bytes(hidden_text: &str) -> Vec<u8> {
+        let mut payload = Vec::with_capacity(PLAINTEXT_PAYLOAD_VERSION.len() + hidden_text.len());
+        payload.extend_from_slice(PLAINTEXT_PAYLOAD_VERSION);
+        payload.extend_from_slice(hidden_text.as_bytes());
+        payload
+    }
+
+    fn assert_processing_error<T>(
+        result: Result<T, ProcessingError>,
+        expected: fn(ProcessingError) -> bool,
+    ) {
+        match result {
+            Ok(_) => panic!("expected processing error"),
+            Err(error) => assert!(expected(error)),
+        }
+    }
 
     #[test]
     fn preserves_unicode_text() {
@@ -318,15 +344,17 @@ mod tests {
     }
 
     #[test]
+    fn preserves_existing_payload_like_characters_when_no_hidden_text_is_requested() {
+        let input = format!("Visible{PAYLOAD_START}{BIT_ZERO}{BIT_ONE}{PAYLOAD_END}\n");
+
+        assert_eq!(process_text(&input, None, Some("ignored")).unwrap(), input);
+    }
+
+    #[test]
     fn hides_unicode_text_without_changing_visible_text() {
         let input = "Visible café 東京 🔐\n";
         let output = process_text(input, Some("secret café"), None).unwrap();
-        let visible: String = output
-            .chars()
-            .filter(|character| {
-                !matches!(*character, PAYLOAD_START | PAYLOAD_END | BIT_ZERO | BIT_ONE)
-            })
-            .collect();
+        let visible = visible_text(&output);
 
         assert_eq!(visible, input);
         assert_ne!(output, input);
@@ -342,11 +370,34 @@ mod tests {
     }
 
     #[test]
+    fn encoded_plaintext_payload_has_expected_bit_count() {
+        let hidden_text = "Aé";
+        let output = process_text("carrier", Some(hidden_text), None).unwrap();
+        let encoded_payload_len = output
+            .chars()
+            .filter(|character| matches!(*character, BIT_ZERO | BIT_ONE))
+            .count();
+        let expected_payload_len = plaintext_payload_bytes(hidden_text).len() * 8;
+
+        assert_eq!(encoded_payload_len, expected_payload_len);
+    }
+
+    #[test]
+    fn empty_hidden_text_still_creates_extractable_payload() {
+        let output = process_text("carrier", Some(""), None).unwrap();
+
+        assert_ne!(output, "carrier");
+        assert_eq!(extract_hidden_text(&output, None).unwrap(), "");
+    }
+
+    #[test]
     fn keeps_trailing_newline_at_end_of_output() {
         let output = process_text("Hello\n", Some("hello"), None).unwrap();
 
         assert!(output.starts_with("Hello"));
         assert!(output.ends_with('\n'));
+        assert_eq!(visible_text(&output), "Hello\n");
+        assert_eq!(extract_hidden_text(&output, None).unwrap(), "hello");
     }
 
     #[test]
@@ -355,6 +406,17 @@ mod tests {
 
         assert!(output.starts_with("Hello"));
         assert!(output.ends_with("\r\n"));
+        assert_eq!(visible_text(&output), "Hello\r\n");
+        assert_eq!(extract_hidden_text(&output, None).unwrap(), "hello");
+    }
+
+    #[test]
+    fn leaves_non_final_newlines_in_visible_text() {
+        let input = "Hello\nmiddle\nend";
+        let output = process_text(input, Some("hello"), None).unwrap();
+
+        assert_eq!(visible_text(&output), input);
+        assert_eq!(extract_hidden_text(&output, None).unwrap(), "hello");
     }
 
     #[test]
@@ -367,14 +429,40 @@ mod tests {
 
     #[test]
     fn encrypted_payload_does_not_contain_hidden_text_when_password_is_present() {
-        let payload = create_hidden_payload("secret café", Some("correct horse battery staple"))
-            .expect("payload should encrypt");
+        let payload =
+            create_hidden_payload("secret café", Some("mysecret")).expect("payload should encrypt");
 
         assert!(payload.starts_with(ENCRYPTED_PAYLOAD_VERSION));
         assert!(
             !payload
                 .windows("secret café".len())
                 .any(|window| window == "secret café".as_bytes())
+        );
+    }
+
+    #[test]
+    fn encrypted_payload_contains_salt_nonce_and_authentication_tag() {
+        let payload = create_hidden_payload("secret", Some("mysecret")).unwrap();
+        let minimum_len = ENCRYPTED_PAYLOAD_VERSION.len() + super::SALT_LEN + super::NONCE_LEN + 16;
+
+        assert!(payload.len() >= minimum_len);
+    }
+
+    #[test]
+    fn encrypted_payload_changes_between_encryptions() {
+        let first = process_text("Visible text", Some("secret"), Some("mysecret")).unwrap();
+        let second = process_text("Visible text", Some("secret"), Some("mysecret")).unwrap();
+
+        assert_ne!(first, second);
+        assert_eq!(visible_text(&first), "Visible text");
+        assert_eq!(visible_text(&second), "Visible text");
+        assert_eq!(
+            extract_hidden_text(&first, Some("mysecret")).unwrap(),
+            "secret"
+        );
+        assert_eq!(
+            extract_hidden_text(&second, Some("mysecret")).unwrap(),
+            "secret"
         );
     }
 
@@ -389,32 +477,164 @@ mod tests {
     }
 
     #[test]
+    fn extracts_plaintext_hidden_text_even_when_password_is_supplied() {
+        let output = process_text("Visible text", Some("secret café"), None).unwrap();
+
+        assert_eq!(
+            extract_hidden_text(&output, Some("unnecessary")).unwrap(),
+            "secret café"
+        );
+    }
+
+    #[test]
+    fn extracts_first_payload_when_multiple_payloads_are_present() {
+        let first = process_text("first", Some("one"), None).unwrap();
+        let second = process_text("second", Some("two"), None).unwrap();
+        let combined = format!("{first}{second}");
+
+        assert_eq!(extract_hidden_text(&combined, None).unwrap(), "one");
+    }
+
+    #[test]
     fn decrypts_hidden_text_with_password() {
         let output = process_text(
             "Visible text",
             Some("secret café 東京 🔐"),
-            Some("correct horse battery staple"),
+            Some("mysecret"),
         )
         .unwrap();
 
         assert_eq!(
-            extract_hidden_text(&output, Some("correct horse battery staple")).unwrap(),
+            extract_hidden_text(&output, Some("mysecret")).unwrap(),
             "secret café 東京 🔐"
         );
     }
 
     #[test]
+    fn decrypts_hidden_text_with_empty_password_when_payload_was_encrypted_that_way() {
+        let output = process_text("Visible text", Some("secret"), Some("")).unwrap();
+
+        assert_eq!(extract_hidden_text(&output, Some("")).unwrap(), "secret");
+    }
+
+    #[test]
     fn encrypted_hidden_text_requires_password() {
-        let output = process_text(
-            "Visible text",
-            Some("secret café"),
-            Some("correct horse battery staple"),
-        )
-        .unwrap();
+        let output = process_text("Visible text", Some("secret café"), Some("mysecret")).unwrap();
 
         assert!(matches!(
             extract_hidden_text(&output, None),
             Err(ProcessingError::EncryptedPayloadNeedsPassword)
         ));
+    }
+
+    #[test]
+    fn encrypted_hidden_text_rejects_wrong_password() {
+        let output = process_text("Visible text", Some("secret café"), Some("mysecret")).unwrap();
+
+        assert_processing_error(extract_hidden_text(&output, Some("wrong")), |error| {
+            matches!(error, ProcessingError::Decryption)
+        });
+    }
+
+    #[test]
+    fn extracting_from_text_without_payload_returns_missing_payload() {
+        assert_processing_error(extract_hidden_text("plain visible text", None), |error| {
+            matches!(error, ProcessingError::MissingPayload)
+        });
+    }
+
+    #[test]
+    fn payload_start_without_end_returns_invalid_payload() {
+        let input = format!("visible{PAYLOAD_START}{BIT_ZERO}{BIT_ONE}");
+
+        assert_processing_error(extract_hidden_text(&input, None), |error| {
+            matches!(error, ProcessingError::InvalidPayload)
+        });
+    }
+
+    #[test]
+    fn payload_with_non_bit_character_returns_invalid_payload() {
+        let input = format!("visible{PAYLOAD_START}{BIT_ZERO}x{PAYLOAD_END}");
+
+        assert_processing_error(extract_hidden_text(&input, None), |error| {
+            matches!(error, ProcessingError::InvalidPayload)
+        });
+    }
+
+    #[test]
+    fn payload_with_non_byte_aligned_bits_returns_invalid_payload() {
+        let input = format!("visible{PAYLOAD_START}{BIT_ZERO}{PAYLOAD_END}");
+
+        assert_processing_error(extract_hidden_text(&input, None), |error| {
+            matches!(error, ProcessingError::InvalidPayload)
+        });
+    }
+
+    #[test]
+    fn payload_with_unknown_version_returns_invalid_payload() {
+        let input = hide_payload("visible", b"RPH9secret");
+
+        assert_processing_error(extract_hidden_text(&input, None), |error| {
+            matches!(error, ProcessingError::InvalidPayload)
+        });
+    }
+
+    #[test]
+    fn plaintext_payload_with_invalid_utf8_returns_invalid_utf8() {
+        let input = hide_payload("visible", &[b'R', b'P', b'H', b'0', 0xff]);
+
+        assert_processing_error(extract_hidden_text(&input, None), |error| {
+            matches!(error, ProcessingError::InvalidUtf8)
+        });
+    }
+
+    #[test]
+    fn encrypted_payload_too_short_for_salt_and_nonce_returns_invalid_payload() {
+        let input = hide_payload("visible", ENCRYPTED_PAYLOAD_VERSION);
+
+        assert_processing_error(extract_hidden_text(&input, Some("mysecret")), |error| {
+            matches!(error, ProcessingError::InvalidPayload)
+        });
+    }
+
+    #[test]
+    fn extracting_payload_decodes_bytes_in_most_significant_bit_order() {
+        let input = format!(
+            "visible{PAYLOAD_START}{BIT_ZERO}{BIT_ONE}{BIT_ZERO}{BIT_ZERO}{BIT_ZERO}{BIT_ZERO}{BIT_ZERO}{BIT_ONE}{PAYLOAD_END}"
+        );
+
+        assert_eq!(extract_payload(&input).unwrap(), vec![0b0100_0001]);
+    }
+
+    #[test]
+    fn display_messages_are_stable() {
+        assert_eq!(
+            ProcessingError::Decryption.to_string(),
+            "failed to decrypt hidden text"
+        );
+        assert_eq!(
+            ProcessingError::EncryptedPayloadNeedsPassword.to_string(),
+            "hidden text is encrypted; provide a decryption password"
+        );
+        assert_eq!(
+            ProcessingError::InvalidPayload.to_string(),
+            "hidden payload is invalid"
+        );
+        assert_eq!(
+            ProcessingError::InvalidUtf8.to_string(),
+            "hidden payload is not valid UTF-8"
+        );
+        assert_eq!(
+            ProcessingError::KeyDerivation.to_string(),
+            "failed to derive encryption key"
+        );
+        assert_eq!(
+            ProcessingError::MissingPayload.to_string(),
+            "no hidden payload found"
+        );
+        assert_eq!(
+            ProcessingError::Encryption.to_string(),
+            "failed to encrypt hidden text"
+        );
     }
 }

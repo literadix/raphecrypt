@@ -88,3 +88,75 @@ impl Cli {
         self.password.as_deref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::Cli;
+
+    #[test]
+    fn parses_input_and_output_paths() {
+        let cli = Cli::try_parse_from([
+            "raphecrypt",
+            "--input",
+            "input.txt",
+            "--output",
+            "output.txt",
+        ])
+        .unwrap();
+
+        assert_eq!(cli.input().unwrap().to_str(), Some("input.txt"));
+        assert_eq!(cli.output().unwrap().to_str(), Some("output.txt"));
+    }
+
+    #[test]
+    fn parses_encrypt_without_password() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--encrypt", "hidden"]).unwrap();
+
+        assert_eq!(cli.encrypt(), Some("hidden"));
+        assert_eq!(cli.password(), None);
+        assert_eq!(cli.decrypt(), None);
+    }
+
+    #[test]
+    fn parses_encrypt_with_password() {
+        let cli = Cli::try_parse_from([
+            "raphecrypt",
+            "--encrypt",
+            "hidden",
+            "--password",
+            "mysecret",
+        ])
+        .unwrap();
+
+        assert_eq!(cli.encrypt(), Some("hidden"));
+        assert_eq!(cli.password(), Some("mysecret"));
+    }
+
+    #[test]
+    fn parses_decrypt_without_password_as_empty_value() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--decrypt"]).unwrap();
+
+        assert_eq!(cli.decrypt(), Some(""));
+        assert_eq!(cli.encrypt(), None);
+        assert_eq!(cli.password(), None);
+    }
+
+    #[test]
+    fn parses_decrypt_with_password() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--decrypt", "mysecret"]).unwrap();
+
+        assert_eq!(cli.decrypt(), Some("mysecret"));
+    }
+
+    #[test]
+    fn rejects_password_without_encrypt() {
+        assert!(Cli::try_parse_from(["raphecrypt", "--password", "mysecret"]).is_err());
+    }
+
+    #[test]
+    fn rejects_encrypt_and_decrypt_together() {
+        assert!(Cli::try_parse_from(["raphecrypt", "--encrypt", "hidden", "--decrypt"]).is_err());
+    }
+}
