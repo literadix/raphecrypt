@@ -1,9 +1,17 @@
 [package]
 name = "raphecrypt"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
 argon2 = "0.5.3"
 chacha20poly1305 = "0.10.1"
 clap = { version = "4.5.38", features = ["derive"] }
+
+[profile.release]
+opt-level = "z"       # or "s"; favors smaller binaries
+lto = "fat"           # more whole-program optimization
+codegen-units = 1     # less parallelism, more optimization
+panic = "abort"       # removes unwind machinery
+strip = "symbols"     # removes symbol names/debug symbols
+debug = false
