@@ -2,11 +2,14 @@
 name = "raphecrypt"
 version = "1.0.0"
 edition = "2024"
+description = "Hide and extract Unicode messages inside visible text."
+readme = "README.md"
 
 [dependencies]
 argon2 = "0.5.3"
 chacha20poly1305 = "0.10.1"
 clap = { version = "4.5.38", features = ["derive"] }
+zeroize = "1.8.2"
 
 [profile.release]
 opt-level = "z"       # or "s"; favors smaller binaries

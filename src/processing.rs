@@ -19,11 +19,12 @@
 
 use std::{error::Error, fmt};
 
-use argon2::Argon2;
+use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::{
     XChaCha20Poly1305, XNonce,
     aead::{Aead, KeyInit, OsRng, rand_core::RngCore},
 };
+use zeroize::Zeroize;
 
 /// Marker inserted before the hidden bit stream.
 const PAYLOAD_START: char = '\u{e0001}';
@@ -44,6 +45,12 @@ const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 24;
 /// XChaCha20-Poly1305 key length in bytes.
 const KEY_LEN: usize = 32;
+/// Argon2id memory cost in KiB.
+const ARGON2_MEMORY_KIB: u32 = 19 * 1024;
+/// Argon2id iteration count.
+const ARGON2_ITERATIONS: u32 = 2;
+/// Argon2id parallelism.
+const ARGON2_PARALLELISM: u32 = 1;
 
 /// Errors returned while creating, hiding, extracting, or decrypting payloads.
 #[derive(Debug)]
@@ -89,7 +96,7 @@ impl Error for ProcessingError {
 /// Hides `hidden_text` inside `input`.
 ///
 /// If `hidden_text` is `None`, the input is returned unchanged. This keeps the
-/// default CLI behavior simple: reading and writing text without `--encrypt` is
+/// default CLI behavior simple: reading and writing text without `--hide` is
 /// a pass-through operation.
 ///
 /// If `password` is `Some`, the hidden text is encrypted before it is embedded.
@@ -172,15 +179,13 @@ fn encrypt_hidden_text(hidden_text: &str, password: &str) -> Result<Vec<u8>, Pro
     OsRng.fill_bytes(&mut salt);
     OsRng.fill_bytes(&mut nonce);
 
-    let mut key = [0_u8; KEY_LEN];
-    Argon2::default()
-        .hash_password_into(password.as_bytes(), &salt, &mut key)
-        .map_err(|_| ProcessingError::KeyDerivation)?;
-
+    let mut key = derive_key(password, &salt)?;
     let cipher = XChaCha20Poly1305::new(&key.into());
     let ciphertext = cipher
         .encrypt(XNonce::from_slice(&nonce), hidden_text.as_bytes())
-        .map_err(|_| ProcessingError::Encryption)?;
+        .map_err(|_| ProcessingError::Encryption);
+    key.zeroize();
+    let ciphertext = ciphertext?;
 
     let mut payload = Vec::with_capacity(
         ENCRYPTED_PAYLOAD_VERSION.len() + salt.len() + nonce.len() + ciphertext.len(),
@@ -209,15 +214,35 @@ fn decrypt_hidden_text(payload: &[u8], password: &str) -> Result<Vec<u8>, Proces
     let (salt, rest) = payload.split_at(SALT_LEN);
     let (nonce, ciphertext) = rest.split_at(NONCE_LEN);
 
+    let mut key = derive_key(password, salt)?;
+    let cipher = XChaCha20Poly1305::new(&key.into());
+    let plaintext = cipher
+        .decrypt(XNonce::from_slice(nonce), ciphertext)
+        .map_err(|_| ProcessingError::Decryption);
+    key.zeroize();
+    plaintext
+}
+
+/// Derives the XChaCha20-Poly1305 key from a password and salt.
+///
+/// Parameters are spelled out instead of relying on `Argon2::default()` so a
+/// future change to password-hardening cost is visible in this file.
+fn derive_key(password: &str, salt: &[u8]) -> Result<[u8; KEY_LEN], ProcessingError> {
+    let params = Params::new(
+        ARGON2_MEMORY_KIB,
+        ARGON2_ITERATIONS,
+        ARGON2_PARALLELISM,
+        Some(KEY_LEN),
+    )
+    .map_err(|_| ProcessingError::KeyDerivation)?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut key = [0_u8; KEY_LEN];
-    Argon2::default()
+
+    argon2
         .hash_password_into(password.as_bytes(), salt, &mut key)
         .map_err(|_| ProcessingError::KeyDerivation)?;
 
-    let cipher = XChaCha20Poly1305::new(&key.into());
-    cipher
-        .decrypt(XNonce::from_slice(nonce), ciphertext)
-        .map_err(|_| ProcessingError::Decryption)
+    Ok(key)
 }
 
 /// Finds, validates, and decodes the marker-delimited hidden payload.
@@ -237,7 +262,7 @@ fn extract_payload(input: &str) -> Result<Vec<u8>, ProcessingError> {
     let encoded_payload = &input[payload_start..end];
     let bit_count = encoded_payload.chars().count();
 
-    if bit_count % 8 != 0 {
+    if !bit_count.is_multiple_of(8) {
         return Err(ProcessingError::InvalidPayload);
     }
 
@@ -270,7 +295,12 @@ fn extract_payload(input: &str) -> Result<Vec<u8>, ProcessingError> {
 /// that final newline sequence. That keeps command-line output pleasant because
 /// a trailing newline remains the final visible output.
 fn hide_payload(visible_text: &str, hidden_payload: &[u8]) -> String {
-    let mut output = String::with_capacity(visible_text.len() + 2 + hidden_payload.len() * 8);
+    let mut output = String::with_capacity(
+        visible_text.len()
+            + PAYLOAD_START.len_utf8()
+            + PAYLOAD_END.len_utf8()
+            + hidden_payload.len() * 8 * BIT_ZERO.len_utf8(),
+    );
     let (visible_body, trailing_newline) = split_trailing_newline(visible_text);
 
     output.push_str(visible_body);

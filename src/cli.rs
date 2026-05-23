@@ -1,54 +1,82 @@
 //! Command-line argument definition.
-//!
-//! The `Cli` type is intentionally a thin clap wrapper. It owns parsed values,
-//! while accessor methods expose borrowed views so the rest of the application
-//! does not need to clone user input such as passwords or hidden messages.
 
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
+use zeroize::Zeroize;
 
 /// Parsed command-line options for one invocation of `raphecrypt`.
 #[derive(Debug, Parser)]
 #[command(
     name = "raphecrypt",
     version,
-    about = "Reads Unicode text, processes it, and writes Unicode text."
+    about = "Hide or extract Unicode messages inside visible text."
 )]
 pub struct Cli {
-    /// Input file. Reads from standard input when omitted.
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        help = "Read visible text from this file"
+    )]
     input: Option<PathBuf>,
 
-    /// Output file. Writes to standard output when omitted.
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        help = "Write output text to this file"
+    )]
     output: Option<PathBuf>,
 
-    /// Unicode text to hide invisibly in the output.
-    ///
-    /// Encryption/hiding and decryption/extraction are separate operating
-    /// modes, so clap rejects invocations that provide both.
-    #[arg(short, long, value_name = "TEXT", conflicts_with = "decrypt")]
-    encrypt: Option<String>,
+    // Keep `--encrypt` as a hidden compatibility alias for earlier README/API
+    // versions, but present the clearer `--hide` name to new users.
+    #[arg(
+        short = 'e',
+        long = "hide",
+        alias = "encrypt",
+        value_name = "TEXT",
+        conflicts_with = "extract",
+        help = "Hide this Unicode text inside the visible input"
+    )]
+    hide: Option<String>,
 
-    /// Extract hidden text. Provide a value to use it as the decryption password.
-    ///
-    /// `num_args = 0..=1` makes the password value optional:
-    ///
-    /// - `--decrypt` means "extract without a password".
-    /// - `--decrypt mysecret` means "decrypt with this password".
-    ///
-    /// `default_missing_value = ""` lets the application distinguish between
-    /// the flag being absent (`None`) and present without a password (`Some("")`).
-    #[arg(short, long, value_name = "PASSWORD", num_args = 0..=1, default_missing_value = "")]
-    decrypt: Option<String>,
+    // Clap represents `--extract` without a value as `Some("")`, which the
+    // application maps to "extract without a password".
+    #[arg(
+        short = 'd',
+        long = "extract",
+        alias = "decrypt",
+        value_name = "PASSWORD",
+        num_args = 0..=1,
+        default_missing_value = "",
+        help = "Extract hidden text; optional value is the decryption password"
+    )]
+    extract: Option<String>,
 
-    /// Password used to encrypt the hidden text before hiding it.
-    ///
-    /// This option only makes sense when text is being hidden, so clap requires
-    /// `--encrypt` whenever `--password` is supplied.
-    #[arg(short, long, value_name = "TEXT", requires = "encrypt")]
+    #[arg(
+        short,
+        long,
+        value_name = "TEXT",
+        conflicts_with_all = ["password_file", "password_stdin"],
+        help = "Password used to protect or decrypt hidden text"
+    )]
     password: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "FILE",
+        conflicts_with_all = ["password", "password_stdin"],
+        help = "Read the password from a file"
+    )]
+    password_file: Option<PathBuf>,
+
+    #[arg(
+        long,
+        conflicts_with_all = ["password", "password_file"],
+        help = "Read the password from standard input"
+    )]
+    password_stdin: bool,
 }
 
 impl Cli {
@@ -67,25 +95,54 @@ impl Cli {
         self.output.as_deref()
     }
 
-    /// Returns the message requested by `--encrypt`, if the user supplied one.
-    pub fn encrypt(&self) -> Option<&str> {
-        self.encrypt.as_deref()
+    /// Returns the message requested by `--hide`, if the user supplied one.
+    pub fn hide(&self) -> Option<&str> {
+        self.hide.as_deref()
     }
 
-    /// Returns the optional value carried by `--decrypt`.
+    /// Returns the optional value carried by `--extract`.
     ///
     /// The cases are:
     ///
-    /// - `None`: decrypt mode was not requested.
-    /// - `Some("")`: decrypt mode was requested without a password.
-    /// - `Some(value)`: decrypt mode was requested with `value` as password.
-    pub fn decrypt(&self) -> Option<&str> {
-        self.decrypt.as_deref()
+    /// - `None`: extract mode was not requested.
+    /// - `Some("")`: extract mode was requested without an inline password.
+    /// - `Some(value)`: extract mode was requested with `value` as password.
+    pub fn extract(&self) -> Option<&str> {
+        self.extract.as_deref()
     }
 
-    /// Returns the password used to encrypt newly hidden text, if any.
+    /// Returns the direct password argument, if any.
     pub fn password(&self) -> Option<&str> {
         self.password.as_deref()
+    }
+
+    /// Returns the file to read the password from, if requested.
+    pub fn password_file(&self) -> Option<&Path> {
+        self.password_file.as_deref()
+    }
+
+    /// Returns whether the password should be read from standard input.
+    pub fn password_stdin(&self) -> bool {
+        self.password_stdin
+    }
+
+    /// Returns whether any non-inline password source was provided.
+    pub fn password_source_requested(&self) -> bool {
+        self.password.is_some() || self.password_file.is_some() || self.password_stdin
+    }
+}
+
+impl Drop for Cli {
+    fn drop(&mut self) {
+        if let Some(value) = &mut self.hide {
+            value.zeroize();
+        }
+        if let Some(value) = &mut self.extract {
+            value.zeroize();
+        }
+        if let Some(value) = &mut self.password {
+            value.zeroize();
+        }
     }
 }
 
@@ -111,52 +168,102 @@ mod tests {
     }
 
     #[test]
-    fn parses_encrypt_without_password() {
-        let cli = Cli::try_parse_from(["raphecrypt", "--encrypt", "hidden"]).unwrap();
+    fn parses_hide_without_password() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--hide", "hidden"]).unwrap();
 
-        assert_eq!(cli.encrypt(), Some("hidden"));
+        assert_eq!(cli.hide(), Some("hidden"));
         assert_eq!(cli.password(), None);
-        assert_eq!(cli.decrypt(), None);
+        assert_eq!(cli.extract(), None);
     }
 
     #[test]
-    fn parses_encrypt_with_password() {
-        let cli = Cli::try_parse_from([
-            "raphecrypt",
-            "--encrypt",
-            "hidden",
-            "--password",
-            "mysecret",
-        ])
-        .unwrap();
+    fn parses_legacy_encrypt_alias() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--encrypt", "hidden"]).unwrap();
 
-        assert_eq!(cli.encrypt(), Some("hidden"));
+        assert_eq!(cli.hide(), Some("hidden"));
+    }
+
+    #[test]
+    fn parses_hide_with_password() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--hide", "hidden", "--password", "mysecret"])
+            .unwrap();
+
+        assert_eq!(cli.hide(), Some("hidden"));
         assert_eq!(cli.password(), Some("mysecret"));
     }
 
     #[test]
-    fn parses_decrypt_without_password_as_empty_value() {
-        let cli = Cli::try_parse_from(["raphecrypt", "--decrypt"]).unwrap();
+    fn parses_extract_without_password_as_empty_value() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--extract"]).unwrap();
 
-        assert_eq!(cli.decrypt(), Some(""));
-        assert_eq!(cli.encrypt(), None);
+        assert_eq!(cli.extract(), Some(""));
+        assert_eq!(cli.hide(), None);
         assert_eq!(cli.password(), None);
     }
 
     #[test]
-    fn parses_decrypt_with_password() {
-        let cli = Cli::try_parse_from(["raphecrypt", "--decrypt", "mysecret"]).unwrap();
+    fn parses_legacy_decrypt_alias() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--decrypt"]).unwrap();
 
-        assert_eq!(cli.decrypt(), Some("mysecret"));
+        assert_eq!(cli.extract(), Some(""));
     }
 
     #[test]
-    fn rejects_password_without_encrypt() {
-        assert!(Cli::try_parse_from(["raphecrypt", "--password", "mysecret"]).is_err());
+    fn parses_extract_with_password() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--extract", "mysecret"]).unwrap();
+
+        assert_eq!(cli.extract(), Some("mysecret"));
     }
 
     #[test]
-    fn rejects_encrypt_and_decrypt_together() {
-        assert!(Cli::try_parse_from(["raphecrypt", "--encrypt", "hidden", "--decrypt"]).is_err());
+    fn parses_password_file() {
+        let cli = Cli::try_parse_from([
+            "raphecrypt",
+            "--hide",
+            "hidden",
+            "--password-file",
+            "pass.txt",
+        ])
+        .unwrap();
+
+        assert_eq!(cli.password_file().unwrap().to_str(), Some("pass.txt"));
+        assert!(cli.password_source_requested());
+    }
+
+    #[test]
+    fn parses_password_stdin() {
+        let cli = Cli::try_parse_from([
+            "raphecrypt",
+            "--input",
+            "input.txt",
+            "--hide",
+            "hidden",
+            "--password-stdin",
+        ])
+        .unwrap();
+
+        assert!(cli.password_stdin());
+        assert!(cli.password_source_requested());
+    }
+
+    #[test]
+    fn rejects_multiple_password_sources() {
+        assert!(
+            Cli::try_parse_from([
+                "raphecrypt",
+                "--hide",
+                "hidden",
+                "--password",
+                "mysecret",
+                "--password-file",
+                "pass.txt"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_hide_and_extract_together() {
+        assert!(Cli::try_parse_from(["raphecrypt", "--hide", "hidden", "--extract"]).is_err());
     }
 }

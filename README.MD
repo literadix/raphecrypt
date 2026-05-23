@@ -2,25 +2,33 @@
 
 `raphecrypt` is a command-line utility for carrying hidden Unicode messages inside ordinary visible text.
 
-It can pass text through unchanged, hide a message inside visible text, protect the hidden message with an optional password, extract a hidden message again, or decrypt an extracted message when the correct password is provided. When no password is given, the message is hidden but not password-protected. The visible text can come from a file or standard input, and the result can be written to a file or standard output.
+It can hide a message in visible text, optionally protect that hidden message with a password, and extract the hidden message again later. Without a password, the message is hidden but not password-protected.
 
-When `--encrypt` is provided, the program inserts an invisible Unicode payload into the output. The visible part of the output remains the original input text.
+## Quick Start
 
-The hidden payload is encoded from the UTF-8 bytes of the `--encrypt` text using invisible Unicode format characters from the `\p{Cf}` category. The current alphabet uses Unicode tag characters so terminals do not render placeholder glyphs for the hidden payload. This hides the text in the output stream, but it is steganographic hiding, not cryptographic encryption by itself.
+Hide a message:
 
-When `--password` is provided, the hidden text is encrypted first using XChaCha20-Poly1305 with a key derived from the password using Argon2id. Without `--password`, the hidden text is only encoded invisibly and is not encrypted.
+```sh
+printf 'Visible text\n' | raphecrypt --hide 'hidden café 東京 🔐' > output.txt
+```
 
-When `--decrypt` is provided without a value, the program extracts a plaintext hidden payload. When `--decrypt <PASSWORD>` is provided, the password is used to decrypt an encrypted hidden payload and the recovered hidden text is written as the output.
+Extract a message that was hidden without a password:
 
-## XChaCha20-Poly1305
+```sh
+raphecrypt --input output.txt --extract
+```
 
-When you use a password, `raphecrypt` protects the hidden message with XChaCha20-Poly1305, a modern authenticated encryption algorithm. For end users, this means the hidden message is designed to remain private unless the correct password is known, and accidental or intentional changes to the protected message should be detected during decryption.
+Hide a message with password protection:
 
-The encryption is strong, but the password still matters. A short, reused, or easy-to-guess password can make the protected message much easier to attack. Use a long, unique passphrase when the hidden message is sensitive.
+```sh
+printf 'Visible text\n' | raphecrypt --hide 'hidden café 東京 🔐' --password 'mysecret' > output.txt
+```
 
-There is no password recovery. If the password is lost or typed differently later, the hidden message cannot be decrypted.
+Extract and decrypt a password-protected message:
 
-Reference: [ChaCha20-Poly1305](https://en.wikipedia.org/wiki/ChaCha20-Poly1305)
+```sh
+raphecrypt --input output.txt --extract 'mysecret'
+```
 
 ## Usage
 
@@ -31,15 +39,18 @@ raphecrypt [OPTIONS]
 Options:
 
 ```text
--i, --input <FILE>    Input file. Reads from standard input when omitted
--o, --output <FILE>   Output file. Writes to standard output when omitted
--e, --encrypt <TEXT>  Unicode text to hide invisibly in the output
--d, --decrypt [PASSWORD]
-                      Extract hidden text. Provide a value to use it as the decryption password
--p, --password <TEXT> Password used to encrypt the hidden text before hiding it
--h, --help            Print help
--V, --version         Print version
+-i, --input <FILE>              Read visible text from this file
+-o, --output <FILE>             Write output text to this file
+-e, --hide <TEXT>               Hide this Unicode text inside the visible input
+-d, --extract [PASSWORD]        Extract hidden text; optional value is the decryption password
+-p, --password <TEXT>           Password used to protect or decrypt hidden text
+    --password-file <FILE>      Read the password from a file
+    --password-stdin            Read the password from standard input
+-h, --help                      Print help
+-V, --version                   Print version
 ```
+
+`--encrypt` remains available as an alias for `--hide`, and `--decrypt` remains available as an alias for `--extract`.
 
 ## Examples
 
@@ -49,52 +60,52 @@ Read from a file and write to a file:
 raphecrypt --input input.txt --output output.txt
 ```
 
-Read from a file and write to standard output:
-
-```sh
-raphecrypt --input input.txt
-```
-
-Read from standard input and write to a file:
-
-```sh
-printf 'café 東京 🔐\n' | raphecrypt --output output.txt
-```
-
 Read from standard input and write to standard output:
 
 ```sh
 printf 'café 東京 🔐\n' | raphecrypt
 ```
 
-Hide Unicode text in the output while only showing the input text:
+Hide Unicode text while leaving the visible text readable:
 
 ```sh
-printf 'Visible text\n' | raphecrypt --encrypt 'hidden café 東京 🔐'
+printf 'Visible text\n' | raphecrypt --hide 'hidden café 東京 🔐'
 ```
 
 Read visible text from a file, hide Unicode text, and write the result to a file:
 
 ```sh
-raphecrypt --input input.txt --output output.txt --encrypt 'hidden café 東京 🔐'
+raphecrypt --input input.txt --output output.txt --hide 'hidden café 東京 🔐'
 ```
 
-Encrypt the hidden text with a password before hiding it:
+Protect the hidden text with a password before hiding it:
 
 ```sh
-printf 'Visible text\n' | raphecrypt --encrypt 'hidden café 東京 🔐' --password 'mysecret'
+printf 'Visible text\n' | raphecrypt --hide 'hidden café 東京 🔐' --password 'mysecret'
 ```
 
 Extract hidden text that was hidden without a password:
 
 ```sh
-raphecrypt --input output.txt --decrypt
+raphecrypt --input output.txt --extract
 ```
 
-Decrypt hidden text that was encrypted with a password:
+Decrypt hidden text that was protected with a password:
 
 ```sh
-raphecrypt --input output.txt --decrypt 'mysecret'
+raphecrypt --input output.txt --extract 'mysecret'
+```
+
+Read the password from a file:
+
+```sh
+raphecrypt --input output.txt --extract --password-file password.txt
+```
+
+Read the password from standard input:
+
+```sh
+printf 'mysecret\n' | raphecrypt --input output.txt --extract --password-stdin
 ```
 
 When running through Cargo during development, put `--` before the program options:
@@ -102,6 +113,32 @@ When running through Cargo during development, put `--` before the program optio
 ```sh
 cargo run -- --input input.txt --output output.txt
 ```
+
+## Passwords
+
+Passwords are optional. If you hide text without a password, the message is only hidden in the visible text. Anyone who knows how to extract the payload can read it.
+
+If the hidden message is sensitive, use a long, unique passphrase. Avoid passing sensitive passwords directly on the command line when possible, because command arguments can be saved in shell history or visible to other local tools. Prefer `--password-file` or `--password-stdin` for sensitive use.
+
+There is no password recovery. If the password is lost or typed differently later, the hidden message cannot be decrypted.
+
+## Security Notes
+
+When you use a password, `raphecrypt` protects the hidden message with XChaCha20-Poly1305, a modern authenticated encryption algorithm. For end users, this means the hidden message is designed to remain private unless the correct password is known, and accidental or intentional changes to the protected message should be detected during extraction.
+
+The encryption is strong, but password strength still matters. A short, reused, or easy-to-guess password can make the protected message much easier to attack.
+
+Hidden Unicode text can be fragile. Some websites, chat systems, editors, formatters, or copy/paste paths may remove or normalize invisible Unicode characters. If that happens, the hidden message may no longer be extractable.
+
+Related reference: [ChaCha20-Poly1305](https://en.wikipedia.org/wiki/ChaCha20-Poly1305)
+
+## Technical Notes
+
+When `--hide` is provided, the program inserts an invisible Unicode payload into the output. The visible part of the output remains the original input text.
+
+The hidden payload uses Unicode format characters from the `\p{Cf}` category. This hides the text in the output stream, but hiding without a password is steganographic hiding, not cryptographic encryption.
+
+When `--password`, `--password-file`, or `--password-stdin` is provided, the hidden text is encrypted before it is embedded. When `--extract` is used without a password, the program extracts a plaintext hidden payload. When a password is provided during extraction, the password is used to decrypt an encrypted hidden payload and the recovered hidden text is written as the output.
 
 ## Build
 
