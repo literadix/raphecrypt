@@ -80,6 +80,7 @@ fn help_text_is_user_facing() {
     assert!(output.status.success());
     assert!(stdout.contains("--hide <TEXT>"));
     assert!(stdout.contains("--extract [<PASSWORD>]"));
+    assert!(stdout.contains("--scan"));
     assert!(stdout.contains("--password-file <FILE>"));
     assert!(stdout.contains("--password-stdin"));
     assert!(!stdout.contains("num_args"));
@@ -214,4 +215,27 @@ fn password_stdin_requires_input_file() {
 
     assert!(!output.status.success());
     assert!(stderr_text(&output).contains("--password-stdin requires --input"));
+}
+
+#[test]
+fn scans_clean_text() {
+    let output = run_raphecrypt(&["--scan"], "Visible café 東京\n");
+    let stdout = stdout_text(&output);
+
+    assert!(output.status.success());
+    assert!(stdout.contains("Findings: 0"));
+    assert!(stdout.contains("No non-visible Unicode characters found."));
+}
+
+#[test]
+fn scans_hidden_payload_characters() {
+    let encoded = run_raphecrypt(&["--hide", "secret"], "Visible text\n");
+    assert!(encoded.status.success());
+
+    let scan = run_raphecrypt(&["--scan"], &stdout_text(&encoded));
+    let stdout = stdout_text(&scan);
+
+    assert!(scan.status.success());
+    assert!(stdout.contains("Unicode tag character"));
+    assert!(stdout.contains("Findings:"));
 }

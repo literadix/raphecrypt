@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use raphecrypt::{cli::Cli, processing};
+use raphecrypt::{cli::Cli, processing, scan};
 use zeroize::Zeroizing;
 
 fn main() {
@@ -22,20 +22,28 @@ fn run() -> Result<(), AppError> {
     validate_password_usage(&cli)?;
 
     let input = read_input(cli.input())?;
-    let password = resolve_password(&cli)?;
+    let password = if cli.scan() {
+        None
+    } else {
+        resolve_password(&cli)?
+    };
 
     // `--extract` is represented as `Some("")` when the flag is present
     // without a password. Convert that empty marker to `None` before passing
     // it into the processing layer so the processing API can model optional
     // passwords in the usual Rust shape.
-    let output = match cli.extract() {
-        Some(inline_password) => {
-            let password =
-                non_empty(inline_password).or_else(|| password.as_ref().map(|p| p.as_str()));
-            processing::extract_hidden_text(&input, password)?
-        }
-        None => {
-            processing::process_text(&input, cli.hide(), password.as_ref().map(|p| p.as_str()))?
+    let output = if cli.scan() {
+        scan::format_scan_report(&scan::scan_text(&input))
+    } else {
+        match cli.extract() {
+            Some(inline_password) => {
+                let password =
+                    non_empty(inline_password).or_else(|| password.as_ref().map(|p| p.as_str()));
+                processing::extract_hidden_text(&input, password)?
+            }
+            None => {
+                processing::process_text(&input, cli.hide(), password.as_ref().map(|p| p.as_str()))?
+            }
         }
     };
     write_output(cli.output(), &output)?;

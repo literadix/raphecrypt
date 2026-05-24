@@ -210,7 +210,8 @@ textarea[readonly] {
   background: #f9fbfa;
 }
 
-.hex-output {
+.hex-output,
+.report-output {
   min-height: 150px;
   font-family:
     "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
@@ -245,7 +246,7 @@ textarea[readonly] {
 
   .tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     width: 100%;
   }
 

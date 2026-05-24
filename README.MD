@@ -43,6 +43,12 @@ Extract and decrypt a password-protected message:
 raphecrypt --input output.txt --extract 'mysecret'
 ```
 
+Scan text for invisible or non-visible Unicode characters:
+
+```sh
+raphecrypt --input output.txt --scan
+```
+
 ## Usage
 
 ```sh
@@ -56,6 +62,7 @@ Options:
 -o, --output <FILE>             Write output text to this file
 -e, --hide <TEXT>               Hide this Unicode text inside the visible input
 -d, --extract [PASSWORD]        Extract hidden text; optional value is the decryption password
+    --scan                      Scan input for non-visible Unicode characters
 -p, --password <TEXT>           Password used to protect or decrypt hidden text
     --password-file <FILE>      Read the password from a file
     --password-stdin            Read the password from standard input
@@ -109,6 +116,12 @@ Decrypt hidden text that was protected with a password:
 raphecrypt --input output.txt --extract 'mysecret'
 ```
 
+Scan a file for invisible or non-visible Unicode characters:
+
+```sh
+raphecrypt --input output.txt --scan
+```
+
 Read the password from a file:
 
 ```sh
@@ -124,7 +137,7 @@ printf 'mysecret\n' | raphecrypt --input output.txt --extract --password-stdin
 When running through Cargo during development, put `--` before the program options:
 
 ```sh
-cargo run -- --input input.txt --output output.txt
+cargo run --bin raphecrypt -- --input input.txt --output output.txt
 ```
 
 ## Passwords

@@ -5,6 +5,7 @@
 //! modules.
 
 pub mod processing;
+pub mod scan;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;

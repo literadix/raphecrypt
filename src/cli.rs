@@ -36,7 +36,7 @@ pub struct Cli {
         long = "hide",
         alias = "encrypt",
         value_name = "TEXT",
-        conflicts_with = "extract",
+        conflicts_with_all = ["extract", "scan"],
         help = "Hide this Unicode text inside the visible input"
     )]
     hide: Option<String>,
@@ -50,9 +50,17 @@ pub struct Cli {
         value_name = "PASSWORD",
         num_args = 0..=1,
         default_missing_value = "",
+        conflicts_with = "scan",
         help = "Extract hidden text; optional value is the decryption password"
     )]
     extract: Option<String>,
+
+    #[arg(
+        long,
+        conflicts_with_all = ["hide", "extract"],
+        help = "Scan input for non-visible Unicode characters"
+    )]
+    scan: bool,
 
     #[arg(
         short,
@@ -109,6 +117,11 @@ impl Cli {
     /// - `Some(value)`: extract mode was requested with `value` as password.
     pub fn extract(&self) -> Option<&str> {
         self.extract.as_deref()
+    }
+
+    /// Returns whether scan mode was requested.
+    pub fn scan(&self) -> bool {
+        self.scan
     }
 
     /// Returns the direct password argument, if any.
@@ -216,6 +229,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_scan_mode() {
+        let cli = Cli::try_parse_from(["raphecrypt", "--scan"]).unwrap();
+
+        assert!(cli.scan());
+        assert_eq!(cli.hide(), None);
+        assert_eq!(cli.extract(), None);
+    }
+
+    #[test]
     fn parses_password_file() {
         let cli = Cli::try_parse_from([
             "raphecrypt",
@@ -265,5 +287,11 @@ mod tests {
     #[test]
     fn rejects_hide_and_extract_together() {
         assert!(Cli::try_parse_from(["raphecrypt", "--hide", "hidden", "--extract"]).is_err());
+    }
+
+    #[test]
+    fn rejects_scan_with_hide_or_extract() {
+        assert!(Cli::try_parse_from(["raphecrypt", "--scan", "--hide", "hidden"]).is_err());
+        assert!(Cli::try_parse_from(["raphecrypt", "--scan", "--extract"]).is_err());
     }
 }

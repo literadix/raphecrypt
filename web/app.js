@@ -10,6 +10,7 @@ const elements = {
   tabs: [...document.querySelectorAll(".tab")],
   encodePanel: document.querySelector("#encode-panel"),
   decodePanel: document.querySelector("#decode-panel"),
+  scanPanel: document.querySelector("#scan-panel"),
   visibleText: document.querySelector("#visible-text"),
   hiddenText: document.querySelector("#hidden-text"),
   encodePassword: document.querySelector("#encode-password"),
@@ -18,12 +19,17 @@ const elements = {
   encodedInput: document.querySelector("#encoded-input"),
   decodePassword: document.querySelector("#decode-password"),
   decodedOutput: document.querySelector("#decoded-output"),
+  scanInput: document.querySelector("#scan-input"),
+  scanOutput: document.querySelector("#scan-output"),
   encodeButton: document.querySelector("#encode-button"),
   decodeButton: document.querySelector("#decode-button"),
+  scanButton: document.querySelector("#scan-button"),
   copyEncoded: document.querySelector("#copy-encoded"),
   copyDecoded: document.querySelector("#copy-decoded"),
+  copyScan: document.querySelector("#copy-scan"),
   encodeMessage: document.querySelector("#encode-message"),
   decodeMessage: document.querySelector("#decode-message"),
+  scanMessage: document.querySelector("#scan-message"),
 };
 
 init();
@@ -80,11 +86,15 @@ function bindUi() {
 
   elements.encodeButton.addEventListener("click", encodeText);
   elements.decodeButton.addEventListener("click", decodeText);
+  elements.scanButton.addEventListener("click", scanText);
   elements.copyEncoded.addEventListener("click", () =>
     copyText(elements.encodedOutput.value, elements.encodeMessage),
   );
   elements.copyDecoded.addEventListener("click", () =>
     copyText(elements.decodedOutput.value, elements.decodeMessage),
+  );
+  elements.copyScan.addEventListener("click", () =>
+    copyText(elements.scanOutput.value, elements.scanMessage),
   );
 }
 
@@ -95,6 +105,7 @@ function selectMode(mode) {
 
   elements.encodePanel.classList.toggle("active", mode === "encode");
   elements.decodePanel.classList.toggle("active", mode === "decode");
+  elements.scanPanel.classList.toggle("active", mode === "scan");
 }
 
 function encodeText() {
@@ -114,9 +125,24 @@ function encodeText() {
     elements.encodedOutput.value = output;
     elements.encodedHex.value = formatHex(output);
     elements.encodedInput.value = output;
+    elements.scanInput.value = output;
     showMessage(elements.encodeMessage, "Encoded", "ok");
   } catch (error) {
     showMessage(elements.encodeMessage, error.message, "error");
+  }
+}
+
+function scanText() {
+  clearMessage(elements.scanMessage);
+
+  try {
+    const output = callWasmString(wasm.raphecrypt_scan, elements.scanInput.value);
+
+    elements.scanOutput.value = output;
+    showMessage(elements.scanMessage, "Scanned", "ok");
+  } catch (error) {
+    elements.scanOutput.value = "";
+    showMessage(elements.scanMessage, error.message, "error");
   }
 }
 
@@ -257,8 +283,10 @@ function setBusy(isBusy) {
   [
     elements.encodeButton,
     elements.decodeButton,
+    elements.scanButton,
     elements.copyEncoded,
     elements.copyDecoded,
+    elements.copyScan,
   ].forEach((button) => {
     button.disabled = isBusy;
   });

@@ -7,7 +7,7 @@
 
 use std::{cell::RefCell, slice, str};
 
-use crate::processing;
+use crate::{processing, scan};
 
 const WASM_RANDOM_LEN: usize = 40;
 
@@ -84,6 +84,18 @@ pub unsafe extern "C" fn raphecrypt_decode(
         let password = unsafe { read_optional_utf8(password_ptr, password_len) }?;
 
         processing::extract_hidden_text(input, password).map_err(|_| "decode failed".to_owned())
+    })();
+
+    finish(result)
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn raphecrypt_scan(input_ptr: *const u8, input_len: usize) -> u64 {
+    let result = (|| {
+        let input = unsafe { read_utf8(input_ptr, input_len) }?;
+        let report = scan::scan_text(input);
+
+        Ok(scan::format_scan_report(&report))
     })();
 
     finish(result)

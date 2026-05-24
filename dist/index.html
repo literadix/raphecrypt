@@ -19,6 +19,7 @@
       <nav class="tabs" aria-label="Mode">
         <button class="tab active" type="button" data-mode="encode">Encode</button>
         <button class="tab" type="button" data-mode="decode">Decode</button>
+        <button class="tab" type="button" data-mode="scan">Scan</button>
       </nav>
 
       <section class="workspace active" id="encode-panel" aria-labelledby="encode-title">
@@ -86,6 +87,30 @@
         <div class="actions">
           <button id="copy-decoded" type="button">Copy hidden text</button>
           <span class="message" id="decode-message"></span>
+        </div>
+      </section>
+
+      <section class="workspace" id="scan-panel" aria-labelledby="scan-title">
+        <div class="panel-heading">
+          <h2 id="scan-title">Scan</h2>
+          <button class="primary" id="scan-button" type="button">Scan</button>
+        </div>
+
+        <div class="grid">
+          <label class="field span-2">
+            <span>Text to inspect</span>
+            <textarea id="scan-input" spellcheck="false"></textarea>
+          </label>
+
+          <label class="field span-2">
+            <span>Scan report</span>
+            <textarea id="scan-output" class="report-output" spellcheck="false" readonly></textarea>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="copy-scan" type="button">Copy report</button>
+          <span class="message" id="scan-message"></span>
         </div>
       </section>
     </main>
