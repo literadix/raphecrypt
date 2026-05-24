@@ -275,16 +275,16 @@ dist/app.js
 dist/raphecrypt.wasm
 ```
 
-Serve the `dist` directory with any static file server. For example:
+Serve the `dist` directory with the native Rust web server:
 
 ```sh
-python3 -m http.server 8000 --directory dist
+cargo run --bin webserver
 ```
 
 Then open:
 
 ```text
-http://localhost:8000
+http://127.0.0.1:8000
 ```
 
 The web app provides:
