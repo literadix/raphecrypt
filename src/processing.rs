@@ -22,9 +22,12 @@ use std::{error::Error, fmt};
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::{
     XChaCha20Poly1305, XNonce,
-    aead::{Aead, KeyInit, OsRng, rand_core::RngCore},
+    aead::{Aead, KeyInit},
 };
 use zeroize::Zeroize;
+
+#[cfg(not(target_arch = "wasm32"))]
+use rand_core::{OsRng, RngCore};
 
 /// Marker inserted before the hidden bit stream.
 const PAYLOAD_START: char = '\u{e0001}';
@@ -162,6 +165,27 @@ fn create_hidden_payload(
     }
 }
 
+/// Builds a hidden payload using caller-provided random bytes for encryption.
+///
+/// This is used by the WASM interface, where the browser supplies randomness
+/// through `crypto.getRandomValues`. `random_bytes` must contain exactly
+/// `SALT_LEN + NONCE_LEN` bytes when a password is supplied.
+pub fn create_hidden_payload_with_random(
+    hidden_text: &str,
+    password: Option<&str>,
+    random_bytes: &[u8],
+) -> Result<Vec<u8>, ProcessingError> {
+    match password {
+        Some(password) => encrypt_hidden_text_with_random(hidden_text, password, random_bytes),
+        None => create_hidden_payload(hidden_text, None),
+    }
+}
+
+/// Hides already-created payload bytes inside visible text.
+pub fn process_payload(input: &str, hidden_payload: &[u8]) -> String {
+    hide_payload(input, hidden_payload)
+}
+
 /// Encrypts hidden text and returns the versioned encrypted payload bytes.
 ///
 /// Layout:
@@ -174,25 +198,57 @@ fn create_hidden_payload(
 /// same key during decryption. The nonce is also stored with the payload; it is
 /// not secret, but must be unique for each encryption under a given key.
 fn encrypt_hidden_text(hidden_text: &str, password: &str) -> Result<Vec<u8>, ProcessingError> {
-    let mut salt = [0_u8; SALT_LEN];
-    let mut nonce = [0_u8; NONCE_LEN];
-    OsRng.fill_bytes(&mut salt);
-    OsRng.fill_bytes(&mut nonce);
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (hidden_text, password);
+        Err(ProcessingError::Encryption)
+    }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let mut salt = [0_u8; SALT_LEN];
+        let mut nonce = [0_u8; NONCE_LEN];
+        OsRng.fill_bytes(&mut salt);
+        OsRng.fill_bytes(&mut nonce);
+
+        encrypt_hidden_text_with_salt_and_nonce(hidden_text, password, &salt, &nonce)
+    }
+}
+
+fn encrypt_hidden_text_with_random(
+    hidden_text: &str,
+    password: &str,
+    random_bytes: &[u8],
+) -> Result<Vec<u8>, ProcessingError> {
+    if random_bytes.len() != SALT_LEN + NONCE_LEN {
+        return Err(ProcessingError::InvalidPayload);
+    }
+
+    let (salt, nonce) = random_bytes.split_at(SALT_LEN);
+
+    encrypt_hidden_text_with_salt_and_nonce(hidden_text, password, salt, nonce)
+}
+
+fn encrypt_hidden_text_with_salt_and_nonce(
+    hidden_text: &str,
+    password: &str,
+    salt: &[u8],
+    nonce: &[u8],
+) -> Result<Vec<u8>, ProcessingError> {
     let mut key = derive_key(password, &salt)?;
     let cipher = XChaCha20Poly1305::new(&key.into());
     let ciphertext = cipher
-        .encrypt(XNonce::from_slice(&nonce), hidden_text.as_bytes())
+        .encrypt(XNonce::from_slice(nonce), hidden_text.as_bytes())
         .map_err(|_| ProcessingError::Encryption);
     key.zeroize();
     let ciphertext = ciphertext?;
 
     let mut payload = Vec::with_capacity(
-        ENCRYPTED_PAYLOAD_VERSION.len() + salt.len() + nonce.len() + ciphertext.len(),
+        ENCRYPTED_PAYLOAD_VERSION.len() + SALT_LEN + NONCE_LEN + ciphertext.len(),
     );
     payload.extend_from_slice(ENCRYPTED_PAYLOAD_VERSION);
-    payload.extend_from_slice(&salt);
-    payload.extend_from_slice(&nonce);
+    payload.extend_from_slice(salt);
+    payload.extend_from_slice(nonce);
     payload.extend_from_slice(&ciphertext);
 
     Ok(payload)

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>raphecrypt</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>raphecrypt</h1>
+          <p>Unicode steganography utility</p>
+        </div>
+        <div class="status" id="runtime-status">Loading WASM</div>
+      </header>
+
+      <nav class="tabs" aria-label="Mode">
+        <button class="tab active" type="button" data-mode="encode">Encode</button>
+        <button class="tab" type="button" data-mode="decode">Decode</button>
+      </nav>
+
+      <section class="workspace active" id="encode-panel" aria-labelledby="encode-title">
+        <div class="panel-heading">
+          <h2 id="encode-title">Encode</h2>
+          <button class="primary" id="encode-button" type="button">Encode</button>
+        </div>
+
+        <div class="grid">
+          <label class="field span-2">
+            <span>Visible text</span>
+            <textarea id="visible-text" spellcheck="false">Hello</textarea>
+          </label>
+
+          <label class="field">
+            <span>Hidden text</span>
+            <textarea id="hidden-text" spellcheck="false">secret</textarea>
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input id="encode-password" type="password" autocomplete="off" />
+          </label>
+
+          <label class="field span-2">
+            <span>Encoded output</span>
+            <textarea id="encoded-output" spellcheck="false" readonly></textarea>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="copy-encoded" type="button">Copy output</button>
+          <span class="message" id="encode-message"></span>
+        </div>
+      </section>
+
+      <section class="workspace" id="decode-panel" aria-labelledby="decode-title">
+        <div class="panel-heading">
+          <h2 id="decode-title">Decode</h2>
+          <button class="primary" id="decode-button" type="button">Decode</button>
+        </div>
+
+        <div class="grid">
+          <label class="field span-2">
+            <span>Encoded text</span>
+            <textarea id="encoded-input" spellcheck="false"></textarea>
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input id="decode-password" type="password" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span>Hidden text</span>
+            <textarea id="decoded-output" spellcheck="false" readonly></textarea>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="copy-decoded" type="button">Copy hidden text</button>
+          <span class="message" id="decode-message"></span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

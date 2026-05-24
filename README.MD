@@ -257,3 +257,37 @@ The release binary will be written to:
 ```sh
 target/release/raphecrypt
 ```
+
+## Web App
+
+Build the static single-page app:
+
+```sh
+sh scripts/build-web.sh
+```
+
+This creates:
+
+```text
+dist/index.html
+dist/styles.css
+dist/app.js
+dist/raphecrypt.wasm
+```
+
+Serve the `dist` directory with any static file server. For example:
+
+```sh
+python3 -m http.server 8000 --directory dist
+```
+
+Then open:
+
+```text
+http://localhost:8000
+```
+
+The web app provides:
+
+- Encode: visible text + hidden text + optional password -> encoded text
+- Decode: encoded text + optional password -> hidden text

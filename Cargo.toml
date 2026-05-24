@@ -5,11 +5,17 @@ edition = "2024"
 description = "Hide and extract Unicode messages inside visible text."
 readme = "README.md"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 argon2 = "0.5.3"
-chacha20poly1305 = "0.10.1"
+chacha20poly1305 = { version = "0.10.1", default-features = false, features = ["alloc"] }
 clap = { version = "4.5.38", features = ["derive"] }
 zeroize = "1.8.2"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 
 [profile.release]
 opt-level = "z"       # or "s"; favors smaller binaries
