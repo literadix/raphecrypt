@@ -210,6 +210,15 @@ textarea[readonly] {
   background: #f9fbfa;
 }
 
+.hex-output {
+  min-height: 150px;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .actions {
   display: flex;
   align-items: center;

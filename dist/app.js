@@ -14,6 +14,7 @@ const elements = {
   hiddenText: document.querySelector("#hidden-text"),
   encodePassword: document.querySelector("#encode-password"),
   encodedOutput: document.querySelector("#encoded-output"),
+  encodedHex: document.querySelector("#encoded-hex"),
   encodedInput: document.querySelector("#encoded-input"),
   decodePassword: document.querySelector("#decode-password"),
   decodedOutput: document.querySelector("#decoded-output"),
@@ -111,11 +112,33 @@ function encodeText() {
     );
 
     elements.encodedOutput.value = output;
+    elements.encodedHex.value = formatHex(output);
     elements.encodedInput.value = output;
     showMessage(elements.encodeMessage, "Encoded", "ok");
   } catch (error) {
     showMessage(elements.encodeMessage, error.message, "error");
   }
+}
+
+function formatHex(value) {
+  const bytes = encoder.encode(value);
+  const rows = [];
+
+  for (let offset = 0; offset < bytes.length; offset += 16) {
+    const chunk = bytes.slice(offset, offset + 16);
+    const address = offset.toString(16).padStart(8, "0");
+    const hex = [...chunk]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join(" ")
+      .padEnd(47, " ");
+    const ascii = [...chunk]
+      .map((byte) => (byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : "."))
+      .join("");
+
+    rows.push(`${address}: ${hex}  ${ascii}`);
+  }
+
+  return rows.join("\n");
 }
 
 function decodeText() {

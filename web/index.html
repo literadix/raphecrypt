@@ -39,13 +39,18 @@
           </label>
 
           <label class="field span-2">
-            <span>Password</span>
+            <span>Password (optional)</span>
             <input id="encode-password" type="password" autocomplete="off" />
           </label>
 
           <label class="field span-2">
             <span>Encoded output</span>
             <textarea id="encoded-output" spellcheck="false" readonly></textarea>
+          </label>
+
+          <label class="field span-2">
+            <span>HEX view of encoded text</span>
+            <textarea id="encoded-hex" class="hex-output" spellcheck="false" readonly></textarea>
           </label>
         </div>
 
@@ -67,12 +72,12 @@
             <textarea id="encoded-input" spellcheck="false"></textarea>
           </label>
 
-          <label class="field">
-            <span>Password</span>
+          <label class="field span-2">
+            <span>Password (optional)</span>
             <input id="decode-password" type="password" autocomplete="off" />
           </label>
 
-          <label class="field">
+          <label class="field span-2">
             <span>Hidden text</span>
             <textarea id="decoded-output" spellcheck="false" readonly></textarea>
           </label>
