@@ -291,3 +291,23 @@ The web app provides:
 
 - Encode: visible text + hidden text + optional password -> encoded text
 - Decode: encoded text + optional password -> hidden text
+
+## Docker
+
+Build the deployment image:
+
+```sh
+docker build -t raphecrypt .
+```
+
+Run it:
+
+```sh
+docker run --rm -p 8000:8000 raphecrypt
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000
+```
