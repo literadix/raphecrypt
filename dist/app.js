@@ -15,12 +15,12 @@ const elements = {
   hiddenText: document.querySelector("#hidden-text"),
   encodePassword: document.querySelector("#encode-password"),
   encodedOutput: document.querySelector("#encoded-output"),
-  encodedHex: document.querySelector("#encoded-hex"),
   encodedInput: document.querySelector("#encoded-input"),
   decodePassword: document.querySelector("#decode-password"),
   decodedOutput: document.querySelector("#decoded-output"),
   scanInput: document.querySelector("#scan-input"),
   scanOutput: document.querySelector("#scan-output"),
+  scanHex: document.querySelector("#scan-hex"),
   encodeButton: document.querySelector("#encode-button"),
   decodeButton: document.querySelector("#decode-button"),
   scanButton: document.querySelector("#scan-button"),
@@ -123,9 +123,9 @@ function encodeText() {
     );
 
     elements.encodedOutput.value = output;
-    elements.encodedHex.value = formatHex(output);
     elements.encodedInput.value = output;
     elements.scanInput.value = output;
+    renderHex(elements.scanHex, output);
     showMessage(elements.encodeMessage, "Encoded", "ok");
   } catch (error) {
     showMessage(elements.encodeMessage, error.message, "error");
@@ -139,6 +139,7 @@ function scanText() {
     const output = callWasmString(wasm.raphecrypt_scan, elements.scanInput.value);
 
     elements.scanOutput.value = output;
+    renderHex(elements.scanHex, elements.scanInput.value);
     showMessage(elements.scanMessage, "Scanned", "ok");
   } catch (error) {
     elements.scanOutput.value = "";
@@ -146,25 +147,113 @@ function scanText() {
   }
 }
 
-function formatHex(value) {
+function renderHex(element, value) {
+  element.replaceChildren(...formatHexNodes(value));
+}
+
+function formatHexNodes(value) {
   const bytes = encoder.encode(value);
-  const rows = [];
+  const hiddenByteIndexes = nonVisibleByteIndexes(value);
+  const nodes = [];
 
   for (let offset = 0; offset < bytes.length; offset += 16) {
     const chunk = bytes.slice(offset, offset + 16);
     const address = offset.toString(16).padStart(8, "0");
-    const hex = [...chunk]
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join(" ")
-      .padEnd(47, " ");
+    const hexNodes = [...chunk].flatMap((byte, index) => {
+      const byteIndex = offset + index;
+      const span = document.createElement("span");
+      span.className = hiddenByteIndexes.has(byteIndex)
+        ? "hex-byte hidden"
+        : "hex-byte";
+      span.textContent = byte.toString(16).padStart(2, "0");
+
+      return index === chunk.length - 1 ? [span] : [span, " "];
+    });
+    const padding = " ".repeat(Math.max(0, 47 - (chunk.length * 3 - 1)));
     const ascii = [...chunk]
       .map((byte) => (byte >= 0x20 && byte <= 0x7e ? String.fromCharCode(byte) : "."))
       .join("");
 
-    rows.push(`${address}: ${hex}  ${ascii}`);
+    nodes.push(`${address}: `, ...hexNodes, `${padding}  ${ascii}`);
+
+    if (offset + 16 < bytes.length) {
+      nodes.push("\n");
+    }
   }
 
-  return rows.join("\n");
+  return nodes;
+}
+
+function nonVisibleByteIndexes(value) {
+  const indexes = new Set();
+  let byteIndex = 0;
+
+  for (const character of value) {
+    const bytes = encoder.encode(character);
+
+    if (isNonVisibleCharacter(character)) {
+      for (let index = 0; index < bytes.length; index += 1) {
+        indexes.add(byteIndex + index);
+      }
+    }
+
+    byteIndex += bytes.length;
+  }
+
+  return indexes;
+}
+
+function isNonVisibleCharacter(character) {
+  if (character === "\n" || character === "\r" || character === "\t" || character === " ") {
+    return false;
+  }
+
+  const codepoint = character.codePointAt(0);
+
+  return (
+    isUnicodeTagCharacter(codepoint) ||
+    isKnownFormatCharacter(codepoint) ||
+    isPrivateUseCharacter(codepoint) ||
+    isControlCharacter(codepoint) ||
+    isNonAsciiWhitespace(character)
+  );
+}
+
+function isUnicodeTagCharacter(codepoint) {
+  return codepoint === 0xe0001 || (codepoint >= 0xe0020 && codepoint <= 0xe007f);
+}
+
+function isKnownFormatCharacter(codepoint) {
+  return (
+    codepoint === 0x00ad ||
+    codepoint === 0x034f ||
+    codepoint === 0x061c ||
+    codepoint === 0x070f ||
+    codepoint === 0x180e ||
+    (codepoint >= 0x200b && codepoint <= 0x200f) ||
+    (codepoint >= 0x202a && codepoint <= 0x202e) ||
+    (codepoint >= 0x2060 && codepoint <= 0x206f) ||
+    codepoint === 0xfeff ||
+    (codepoint >= 0xfff9 && codepoint <= 0xfffb) ||
+    (codepoint >= 0x1bca0 && codepoint <= 0x1bca3) ||
+    (codepoint >= 0x1d173 && codepoint <= 0x1d17a)
+  );
+}
+
+function isPrivateUseCharacter(codepoint) {
+  return (
+    (codepoint >= 0xe000 && codepoint <= 0xf8ff) ||
+    (codepoint >= 0xf0000 && codepoint <= 0xffffd) ||
+    (codepoint >= 0x100000 && codepoint <= 0x10fffd)
+  );
+}
+
+function isControlCharacter(codepoint) {
+  return codepoint < 0x20 || (codepoint >= 0x7f && codepoint <= 0x9f);
+}
+
+function isNonAsciiWhitespace(character) {
+  return /\s/u.test(character) && !["\n", "\r", "\t", " "].includes(character);
 }
 
 function decodeText() {

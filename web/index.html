@@ -49,10 +49,6 @@
             <textarea id="encoded-output" spellcheck="false" readonly></textarea>
           </label>
 
-          <label class="field span-2">
-            <span>HEX view of encoded text</span>
-            <textarea id="encoded-hex" class="hex-output" spellcheck="false" readonly></textarea>
-          </label>
         </div>
 
         <div class="actions">
@@ -106,6 +102,11 @@
             <span>Scan report</span>
             <textarea id="scan-output" class="report-output" spellcheck="false" readonly></textarea>
           </label>
+
+          <div class="field span-2">
+            <span>HEX view of scanned text</span>
+            <pre id="scan-hex" class="hex-output" aria-live="polite"></pre>
+          </div>
         </div>
 
         <div class="actions">
