@@ -17,6 +17,20 @@ It can hide a message in visible text, optionally protect that hidden message wi
 
 This is not a replacement for secure messaging. Some apps and websites may remove invisible Unicode characters, so test the full copy/paste or delivery path before relying on it.
 
+## Images of WASM UI
+
+### Encode
+
+![raphecrypt encode view](docs/images/encode.png)
+
+### Decode
+
+![raphecrypt decode view](docs/images/decode.png)
+
+### Scan
+
+![raphecrypt scan view](docs/images/scan.png)
+
 ## Quick Start
 
 Hide a message:
