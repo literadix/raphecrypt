@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs, io,
     io::Write,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
@@ -20,7 +20,11 @@ fn run_raphecrypt(args: &[&str], stdin: &str) -> Output {
         .as_mut()
         .expect("stdin should be piped")
         .write_all(stdin.as_bytes())
-        .expect("failed to write test stdin");
+        .unwrap_or_else(|error| {
+            if error.kind() != io::ErrorKind::BrokenPipe {
+                panic!("failed to write test stdin: {error}");
+            }
+        });
 
     child
         .wait_with_output()
