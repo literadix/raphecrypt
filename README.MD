@@ -1,6 +1,6 @@
 # raphecrypt
 
-`raphecrypt` is a command-line utility for carrying hidden Unicode messages inside ordinary visible text.
+`raphecrypt` is a command-line utility and WASM UI for carrying hidden Unicode messages inside ordinary visible text.
 
 It can hide a message in visible text, optionally protect that hidden message with a password, and extract the hidden message again later. Without a password, the message is hidden but not password-protected.
 
