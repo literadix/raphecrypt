@@ -324,3 +324,14 @@ Then open:
 ```text
 http://127.0.0.1:8000
 ```
+
+## License
+
+This project is licensed under the MIT License with the Commons Clause.
+
+Copyright (c) 2026 raphecrypt contributors.
+
+You may use, copy, modify, and distribute the software, but the license does
+not grant the right to sell the software or a product/service whose value
+derives entirely or substantially from the functionality of this software. See
+[LICENSE](LICENSE) for the full terms.

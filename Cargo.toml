@@ -4,6 +4,7 @@ version = "1.0.0"
 edition = "2024"
 description = "Hide and extract Unicode messages inside visible text."
 readme = "README.md"
+license-file = "LICENSE"
 
 [lib]
 crate-type = ["rlib", "cdylib"]
