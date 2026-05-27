@@ -344,22 +344,40 @@ The web app provides:
 
 ## Docker
 
-Build the deployment image:
+The Docker image is published on Docker Hub:
 
-```sh
-docker build -t raphecrypt .
+```text
+https://hub.docker.com/r/literadix/raphecrypt/tags
 ```
 
-Run it:
+Pull the latest image:
 
 ```sh
-docker run --rm -p 8000:8000 raphecrypt
+docker pull literadix/raphecrypt:latest
+```
+
+Run the web app:
+
+```sh
+docker run --rm -p 8000:8000 literadix/raphecrypt:latest
 ```
 
 Then open:
 
 ```text
 http://127.0.0.1:8000
+```
+
+To build the image locally instead:
+
+```sh
+docker build -t raphecrypt .
+```
+
+Run the local image:
+
+```sh
+docker run --rm -p 8000:8000 raphecrypt
 ```
 
 ## License
