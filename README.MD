@@ -1,4 +1,4 @@
-# raphecrypt
+![raphecrypt](docs/images/banner.png)
 
 [![Rust](https://github.com/literadix/raphecrypt/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/literadix/raphecrypt/actions/workflows/rust.yml)
 [![Docker Image CI](https://github.com/literadix/raphecrypt/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/literadix/raphecrypt/actions/workflows/docker-image.yml)
