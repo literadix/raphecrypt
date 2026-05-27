@@ -35,6 +35,10 @@ This is not a replacement for secure messaging. Some apps and websites may remov
 
 ## Quick Start
 
+Download binaries and source code:
+
+https://github.com/literadix/raphecrypt/releases/
+
 Hide a message:
 
 ```sh
