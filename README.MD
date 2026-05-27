@@ -399,16 +399,6 @@ which keeps the deployable image small and minimizes OS-package CVE findings.
 
 ## GitHub Releases
 
-Tagged releases publish prebuilt binaries and the static web bundle as GitHub
-Release assets.
-
-Create and push a version tag:
-
-```sh
-git tag v1.0.0
-git push origin v1.0.0
-```
-
 The release workflow builds:
 
 - `raphecrypt-linux-x86_64.tar.gz`
