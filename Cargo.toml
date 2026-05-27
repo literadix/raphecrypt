@@ -1,6 +1,6 @@
 [package]
 name = "raphecrypt"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 description = "Hide and extract Unicode messages inside visible text."
 readme = "README.md"
