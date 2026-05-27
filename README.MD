@@ -380,6 +380,10 @@ Run the local image:
 docker run --rm -p 8000:8000 raphecrypt
 ```
 
+The runtime image uses `scratch` and a statically linked Rust web server. It
+does not include a package manager, shell, or Debian/Alpine runtime packages,
+which keeps the deployable image small and minimizes OS-package CVE findings.
+
 ## License
 
 This project is licensed under the MIT License with the Commons Clause.
