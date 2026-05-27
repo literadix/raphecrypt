@@ -1,5 +1,9 @@
 # raphecrypt
 
+[![Rust](https://github.com/literadix/raphecrypt/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/literadix/raphecrypt/actions/workflows/rust.yml)
+[![Docker Image CI](https://github.com/literadix/raphecrypt/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/literadix/raphecrypt/actions/workflows/docker-image.yml)
+
+
 Utility and WASM UI for carrying hidden Unicode messages inside ordinary visible text. It can hide a message in visible text, optionally protect that hidden message with a password, and extract the hidden message again later. Without a password, the message is hidden but not password-protected.
 
 ## Use Cases
