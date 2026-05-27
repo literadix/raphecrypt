@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-binaries:
+    name: Build ${{ matrix.asset_name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: raphecrypt-linux-x86_64
+            archive_name: raphecrypt-linux-x86_64.tar.gz
+            binary_ext: ""
+          - os: macos-latest
+            asset_name: raphecrypt-macos-aarch64
+            archive_name: raphecrypt-macos-aarch64.tar.gz
+            binary_ext: ""
+          - os: windows-latest
+            asset_name: raphecrypt-windows-x86_64
+            archive_name: raphecrypt-windows-x86_64.zip
+            binary_ext: ".exe"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build binaries
+        run: cargo build --release --bins
+
+      - name: Package Unix binaries
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "release/${{ matrix.asset_name }}"
+          cp "target/release/raphecrypt${{ matrix.binary_ext }}" "release/${{ matrix.asset_name }}/"
+          cp "target/release/webserver${{ matrix.binary_ext }}" "release/${{ matrix.asset_name }}/"
+          cp README.md LICENSE DISCLAIMER.md "release/${{ matrix.asset_name }}/"
+          tar -czf "${{ matrix.archive_name }}" -C release "${{ matrix.asset_name }}"
+
+      - name: Package Windows binaries
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "release/${{ matrix.asset_name }}"
+          Copy-Item "target/release/raphecrypt${{ matrix.binary_ext }}" "release/${{ matrix.asset_name }}/"
+          Copy-Item "target/release/webserver${{ matrix.binary_ext }}" "release/${{ matrix.asset_name }}/"
+          Copy-Item README.md, LICENSE, DISCLAIMER.md "release/${{ matrix.asset_name }}/"
+          Compress-Archive -Path "release/${{ matrix.asset_name }}" -DestinationPath "${{ matrix.archive_name }}"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive_name }}
+          path: ${{ matrix.archive_name }}
+          if-no-files-found: error
+
+  build-web:
+    name: Build web bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Build web bundle
+        run: sh scripts/build-web.sh
+
+      - name: Package web bundle
+        run: zip -r raphecrypt-web-dist.zip dist README.md LICENSE DISCLAIMER.md
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raphecrypt-web-dist.zip
+          path: raphecrypt-web-dist.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - build-binaries
+      - build-web
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
