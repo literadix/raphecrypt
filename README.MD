@@ -19,6 +19,14 @@ Utility and WASM UI for carrying hidden Unicode messages inside ordinary visible
 
 This is not a replacement for secure messaging. Some apps and websites may remove invisible Unicode characters, so test the full copy/paste or delivery path before relying on it.
 
+## Hosted Web App, fully functional
+
+The static web app is deployed with GitHub Pages:
+
+```text
+https://literadix.github.io/raphecrypt/
+```
+
 ## Images of WASM UI
 
 ### Encode
@@ -349,18 +357,6 @@ The web app provides:
 
 - Encode: visible text + hidden text + optional password -> encoded text
 - Decode: encoded text + optional password -> hidden text
-
-## Hosted Web App
-
-The static web app is deployed with GitHub Pages:
-
-```text
-https://literadix.github.io/raphecrypt/
-```
-
-The deployment workflow builds `dist/` from the Rust/WASM source and publishes
-it on every push to `main`. In GitHub, enable Pages with **Source: GitHub
-Actions** for the repository.
 
 ## Docker
 
