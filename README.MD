@@ -21,11 +21,8 @@ This is not a replacement for secure messaging. Some apps and websites may remov
 
 ## Hosted Web App, fully functional
 
-The static web app is deployed with GitHub Pages:
+The static web app is deployed with GitHub Pages: https://literadix.github.io/raphecrypt/
 
-```text
-https://literadix.github.io/raphecrypt/
-```
 
 ## Images of WASM UI
 
