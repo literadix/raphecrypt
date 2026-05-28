@@ -6,6 +6,14 @@
 
 Utility and WASM UI for carrying hidden Unicode messages inside ordinary visible text. It can hide a message in visible text, optionally protect that hidden message with a password, and extract the hidden message again later. Without a password, the message is hidden but not password-protected.
 
+## Support
+
+Every contribution helps keep the project maintained, documented, and available for everyone who needs a small, focused Unicode steganography tool. If `raphecrypt` saves you time, helps with a project, or simply feels useful, you can support its development here:
+
+[![Fund raphecrypt on Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support%20raphecrypt-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/bednarzhani)
+
+
+
 ## Use Cases
 
 `raphecrypt` is useful when you want text to carry a second layer of information while still looking like ordinary text.
